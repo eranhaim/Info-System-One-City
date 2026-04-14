@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #effcfc;
+  --color-brand-100: #d6f7f7;
+  --color-brand-200: #b2eeef;
+  --color-brand-300: #7ce0e3;
+  --color-brand-400: #3ec9cf;
+  --color-brand-500: #22adb5;
+  --color-brand-600: #1f8c98;
+  --color-brand-700: #20717b;
+  --color-brand-800: #225c65;
+  --color-brand-900: #214d55;
+  --color-brand-950: #103239;
+}
+
+@layer base {
+  body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+}
