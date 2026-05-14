@@ -2,7 +2,9 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Query
 
-from app.services.database import chat_logs_col, inquiries_col
+from bson import ObjectId
+
+from app.services.database import chat_logs_col, inquiries_col, users_col
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -88,10 +90,15 @@ async def duration_by_employee():
 
     enriched = []
     for r in results:
-        name = r["_id"] or "לא ידוע"
-        inq = await col.find_one({"user_id": r["_id"], "user_id": {"$ne": None}})
-        if inq and "user_name" in inq:
-            name = inq.get("user_name", name)
+        name = "לא ידוע"
+        uid = r["_id"]
+        if uid:
+            try:
+                user = await users_col().find_one({"_id": ObjectId(uid)})
+                if user:
+                    name = user.get("name", uid)
+            except Exception:
+                name = uid
         enriched.append({
             "employee": name,
             "avg_duration_ms": round(r["avg_duration_ms"]),
@@ -151,10 +158,15 @@ async def employee_performance():
         today_count = await col.count_documents({
             "user_id": r["_id"], "opened_at": {"$gte": today_start},
         })
-        sample = await col.find_one({"user_id": r["_id"]})
-        name = r["_id"] or "לא ידוע"
-        if sample:
-            name = sample.get("user_name", name)
+        name = "לא ידוע"
+        uid = r["_id"]
+        if uid:
+            try:
+                user = await users_col().find_one({"_id": ObjectId(uid)})
+                if user:
+                    name = user.get("name", uid)
+            except Exception:
+                name = uid
         enriched.append({
             "user_id": r["_id"],
             "name": name,
