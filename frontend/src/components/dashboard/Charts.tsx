@@ -3,6 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar,
   PieChart, Pie, Cell, Legend,
+  type PieLabelRenderProps,
 } from 'recharts'
 import {
   getInquiriesOverTime, getDurationByEmployee,
@@ -89,7 +90,7 @@ export default function Charts() {
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
-                label={(props: Record<string, unknown>) => `${props.name ?? ''} ${((Number(props.percent) || 0) * 100).toFixed(0)}%`}
+                label={(props: PieLabelRenderProps) => `${props.name ?? ''} ${((Number(props.percent) || 0) * 100).toFixed(0)}%`}
                 labelLine={false}
                 fontSize={11}
               >
