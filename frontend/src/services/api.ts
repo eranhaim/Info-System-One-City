@@ -2,6 +2,17 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api' })
 
+// ---- Admin Auth ----
+
+export async function adminLogin(password: string): Promise<boolean> {
+  try {
+    await api.post('/admin/login', { password })
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ---- Cities ----
 
 export interface City {
