@@ -57,7 +57,7 @@ export default function Charts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip labelFormatter={(v) => `תאריך: ${v}`} formatter={(v: number) => [v, 'פניות']} />
+              <Tooltip labelFormatter={(v) => `תאריך: ${v}`} formatter={(v) => [String(v), 'פניות']} />
               <Area type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={2} fill="url(#colorCount)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -71,7 +71,7 @@ export default function Charts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatDurationMin(v)} />
               <YAxis dataKey="employee" type="category" tick={{ fontSize: 11 }} width={80} />
-              <Tooltip formatter={(v: number) => [formatDurationMin(v), 'ממוצע']} />
+              <Tooltip formatter={(v) => [formatDurationMin(Number(v)), 'ממוצע']} />
               <Bar dataKey="avg_duration_ms" fill="#06b6d4" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -89,7 +89,7 @@ export default function Charts() {
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
-                label={({ city, percent }) => `${city} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
                 fontSize={11}
               >
@@ -98,7 +98,7 @@ export default function Charts() {
                 ))}
               </Pie>
               <Legend formatter={(v) => <span className="text-xs">{v}</span>} />
-              <Tooltip formatter={(v: number) => [v, 'פניות']} />
+              <Tooltip formatter={(v) => [String(v), 'פניות']} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -111,7 +111,7 @@ export default function Charts() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="hour" tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}:00`} />
               <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip labelFormatter={(v) => `שעה ${v}:00`} formatter={(v: number) => [v, 'פניות']} />
+              <Tooltip labelFormatter={(v) => `שעה ${v}:00`} formatter={(v) => [String(v), 'פניות']} />
               <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
