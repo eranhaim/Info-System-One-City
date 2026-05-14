@@ -89,7 +89,7 @@ class RAGService:
         self._condense_llm = ChatOpenAI(
             model=settings.llm_model_name,
             openai_api_key=settings.openai_api_key,
-            temperature=0.0,
+            temperature=0.3,
         )
 
         self._qa_prompt = ChatPromptTemplate.from_messages([

@@ -3,7 +3,12 @@ import re
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import CityCreate, CityResponse, MessageResponse
+from app.models.schemas import (
+    CityConfigUpdate,
+    CityCreate,
+    CityResponse,
+    MessageResponse,
+)
 from app.services import s3_service
 from app.services.document_loader import chunk_text, extract_text
 from app.services.standardiser import standardise
@@ -39,19 +44,47 @@ async def create_city(body: CityCreate):
     if city_id in existing:
         raise HTTPException(status_code=409, detail="יישוב זה כבר קיים במערכת.")
     s3_service.create_city(city_id)
-    return CityResponse(id=city_id, name=body.name, file_count=0)
+
+    config: dict = {}
+    if body.widget_id:
+        config["widget_id"] = body.widget_id
+    if body.folder_id:
+        config["folder_id"] = body.folder_id
+    if config:
+        s3_service.save_city_config(city_id, config)
+
+    return CityResponse(
+        id=city_id,
+        name=body.name,
+        file_count=0,
+        widget_id=body.widget_id,
+        folder_id=body.folder_id,
+    )
+
+
+@router.put("/{city_id}/config", response_model=MessageResponse)
+async def update_city_config(city_id: str, body: CityConfigUpdate):
+    """Update the Gentrix widget_id and/or folder_id for a city."""
+    config: dict = {}
+    if body.widget_id is not None:
+        config["widget_id"] = body.widget_id
+    if body.folder_id is not None:
+        config["folder_id"] = body.folder_id
+    if not config:
+        raise HTTPException(status_code=400, detail="לא סופקו שדות לעדכון.")
+    s3_service.save_city_config(city_id, config)
+    return MessageResponse(message="ההגדרות עודכנו בהצלחה.")
 
 
 @router.delete("/{city_id}", response_model=MessageResponse)
 async def delete_city(city_id: str):
     s3_service.delete_city(city_id)
-    vector_store_manager.delete(city_id)
     return MessageResponse(message=f"היישוב {city_id} נמחק בהצלחה.")
 
 
 @router.post("/{city_id}/sync", response_model=MessageResponse)
 async def sync_city(city_id: str):
-    """Rebuild a city's FAISS index by standardising all files through GPT-4.1."""
+    """Consolidate all files through GPT-4.1 and rebuild FAISS index."""
     files = s3_service.list_files(city_id)
     if not files:
         raise HTTPException(status_code=400, detail="אין קבצים ליישוב זה.")

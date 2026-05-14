@@ -2,15 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { sendChat } from '../services/api'
 import MessageBubble from './MessageBubble'
 
-interface Source {
-  filename: string
-  page_content: string
-}
-
 interface Message {
   role: 'user' | 'assistant'
   content: string
-  sources?: Source[]
 }
 
 interface Props {
@@ -46,7 +40,7 @@ export default function ChatPanel({ cityId }: Props) {
       setSessionId(res.session_id)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: res.answer, sources: res.sources },
+        { role: 'assistant', content: res.answer },
       ])
     } catch {
       setMessages((prev) => [
@@ -75,7 +69,7 @@ export default function ChatPanel({ cityId }: Props) {
           </div>
         )}
         {messages.map((m, i) => (
-          <MessageBubble key={i} role={m.role} content={m.content} sources={m.sources} />
+          <MessageBubble key={i} role={m.role} content={m.content} />
         ))}
         {loading && (
           <div className="flex justify-end mb-4">

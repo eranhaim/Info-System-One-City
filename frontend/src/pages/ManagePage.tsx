@@ -1,20 +1,34 @@
 import { useEffect, useState } from 'react'
 import CitySelector from '../components/CitySelector'
 import FileManager from '../components/FileManager'
-import { createCity, deleteCity, getCities, syncCity } from '../services/api'
+import {
+  createCity,
+  deleteCity,
+  getCities,
+  syncCity,
+  updateCityConfig,
+} from '../services/api'
 
 interface City {
   id: string
   name: string
   file_count: number
+  widget_id?: string | null
+  folder_id?: string | null
 }
 
 export default function ManagePage() {
   const [cityId, setCityId] = useState('')
   const [cities, setCities] = useState<City[]>([])
   const [newCityName, setNewCityName] = useState('')
+  const [newWidgetId, setNewWidgetId] = useState('')
+  const [newFolderId, setNewFolderId] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [editingCity, setEditingCity] = useState<string | null>(null)
+  const [editWidgetId, setEditWidgetId] = useState('')
+  const [editFolderId, setEditFolderId] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const loadCities = () => getCities().then(setCities)
 
@@ -23,8 +37,10 @@ export default function ManagePage() {
   const handleCreateCity = async () => {
     const name = newCityName.trim()
     if (!name) return
-    await createCity(name)
+    await createCity(name, newWidgetId.trim() || undefined, newFolderId.trim() || undefined)
     setNewCityName('')
+    setNewWidgetId('')
+    setNewFolderId('')
     loadCities()
   }
 
@@ -33,6 +49,28 @@ export default function ManagePage() {
     await deleteCity(id)
     if (cityId === id) setCityId('')
     loadCities()
+  }
+
+  const startEditing = (c: City) => {
+    setEditingCity(c.id)
+    setEditWidgetId(c.widget_id || '')
+    setEditFolderId(c.folder_id || '')
+  }
+
+  const handleSaveConfig = async (id: string) => {
+    setSaving(true)
+    try {
+      await updateCityConfig(id, {
+        widget_id: editWidgetId.trim() || undefined,
+        folder_id: editFolderId.trim() || undefined,
+      })
+      setEditingCity(null)
+      loadCities()
+    } catch {
+      alert('שגיאה בשמירת ההגדרות.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -51,50 +89,139 @@ export default function ManagePage() {
             <h3 className="font-semibold text-gray-800">ניהול יישובים</h3>
           </div>
 
-          <div className="flex gap-2">
-            <input
-              value={newCityName}
-              onChange={(e) => setNewCityName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateCity()}
-              placeholder="שם יישוב חדש..."
-              aria-label="שם יישוב חדש"
-              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none shadow-sm transition-all duration-150 focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500 hover:border-gray-300"
-            />
-            <button
-              onClick={handleCreateCity}
-              disabled={!newCityName.trim()}
-              className="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium shadow-sm shadow-brand-600/20 hover:bg-brand-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:shadow-none"
-            >
-              הוסף יישוב
-            </button>
+          {/* New city form */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={newCityName}
+                onChange={(e) => setNewCityName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateCity()}
+                placeholder="שם יישוב חדש..."
+                aria-label="שם יישוב חדש"
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none shadow-sm transition-all duration-150 focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500 hover:border-gray-300"
+              />
+              <button
+                onClick={handleCreateCity}
+                disabled={!newCityName.trim()}
+                className="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium shadow-sm shadow-brand-600/20 hover:bg-brand-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:shadow-none"
+              >
+                הוסף יישוב
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newWidgetId}
+                onChange={(e) => setNewWidgetId(e.target.value)}
+                placeholder="Widget ID (Gentrix)..."
+                aria-label="Widget ID"
+                dir="ltr"
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none shadow-sm transition-all duration-150 focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500 hover:border-gray-300 font-mono text-xs"
+              />
+              <input
+                value={newFolderId}
+                onChange={(e) => setNewFolderId(e.target.value)}
+                placeholder="Folder ID (Gentrix)..."
+                aria-label="Folder ID"
+                dir="ltr"
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none shadow-sm transition-all duration-150 focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500 hover:border-gray-300 font-mono text-xs"
+              />
+            </div>
           </div>
 
+          {/* City list */}
           {cities.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-4">אין יישובים במערכת.</p>
           ) : (
             <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-50">
               {cities.map((c) => (
-                <div key={c.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50/60 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-brand-600">
-                        <path fillRule="evenodd" d="m9.69 18.933.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 0 0 .281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 1 0 3 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 0 0 2.274 1.765 11.842 11.842 0 0 0 .976.544l.062.029.018.008.006.003ZM10 11.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" clipRule="evenodd" />
-                      </svg>
+                <div key={c.id} className="px-4 py-3 hover:bg-gray-50/60 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-brand-600">
+                          <path fillRule="evenodd" d="m9.69 18.933.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 0 0 .281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 1 0 3 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 0 0 2.274 1.765 11.842 11.842 0 0 0 .976.544l.062.029.018.008.006.003ZM10 11.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="font-medium text-sm text-gray-800">{c.name}</span>
+                        <span className="text-gray-400 text-xs mr-2">{c.file_count} קבצים</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-medium text-sm text-gray-800">{c.name}</span>
-                      <span className="text-gray-400 text-xs mr-2">{c.file_count} קבצים</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => editingCity === c.id ? setEditingCity(null) : startEditing(c)}
+                        aria-label={`ערוך הגדרות ${c.name}`}
+                        className="text-gray-400 hover:text-brand-600 transition-colors p-1.5 rounded-lg hover:bg-brand-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                          <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                          <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25h5.5a.75.75 0 0 0 0-1.5h-5.5A2.75 2.75 0 0 0 2 5.75v8.5A2.75 2.75 0 0 0 4.75 17h8.5A2.75 2.75 0 0 0 16 14.25v-5.5a.75.75 0 0 0-1.5 0v5.5c0 .69-.56 1.25-1.25 1.25h-8.5c-.69 0-1.25-.56-1.25-1.25v-8.5Z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCity(c.id)}
+                        aria-label={`מחק ${c.name}`}
+                        className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                          <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteCity(c.id)}
-                    aria-label={`מחק ${c.name}`}
-                    className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                      <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+
+                  {/* Gentrix IDs display */}
+                  {editingCity !== c.id && (c.widget_id || c.folder_id) && (
+                    <div className="mt-2 mr-10 flex flex-wrap gap-x-4 gap-y-1">
+                      {c.widget_id && (
+                        <span className="text-xs text-gray-400 font-mono" dir="ltr">
+                          <span className="text-gray-500">widget:</span> {c.widget_id.slice(0, 12)}...
+                        </span>
+                      )}
+                      {c.folder_id && (
+                        <span className="text-xs text-gray-400 font-mono" dir="ltr">
+                          <span className="text-gray-500">folder:</span> {c.folder_id.slice(0, 12)}...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Inline edit form */}
+                  {editingCity === c.id && (
+                    <div className="mt-3 mr-10 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          value={editWidgetId}
+                          onChange={(e) => setEditWidgetId(e.target.value)}
+                          placeholder="Widget ID..."
+                          dir="ltr"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500"
+                        />
+                        <input
+                          value={editFolderId}
+                          onChange={(e) => setEditFolderId(e.target.value)}
+                          placeholder="Folder ID..."
+                          dir="ltr"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono outline-none focus:ring-2 focus:ring-brand-400/40 focus:border-brand-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveConfig(c.id)}
+                          disabled={saving}
+                          className="px-4 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
+                        >
+                          {saving ? 'שומר...' : 'שמור'}
+                        </button>
+                        <button
+                          onClick={() => setEditingCity(null)}
+                          className="px-4 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors"
+                        >
+                          ביטול
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -3,12 +3,21 @@ from pydantic import BaseModel
 
 class CityCreate(BaseModel):
     name: str
+    widget_id: str | None = None
+    folder_id: str | None = None
 
 
 class CityResponse(BaseModel):
     id: str
     name: str
     file_count: int
+    widget_id: str | None = None
+    folder_id: str | None = None
+
+
+class CityConfigUpdate(BaseModel):
+    widget_id: str | None = None
+    folder_id: str | None = None
 
 
 class FileResponse(BaseModel):
@@ -23,14 +32,8 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 
-class SourceDocument(BaseModel):
-    filename: str
-    page_content: str
-
-
 class ChatResponse(BaseModel):
     answer: str
-    sources: list[SourceDocument]
     session_id: str
 
 

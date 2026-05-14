@@ -1,11 +1,16 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, UploadFile
 
 from app.models.schemas import FileResponse, MessageResponse
 from app.services import s3_service
-from app.services.document_loader import SUPPORTED_EXTENSIONS, chunk_document
-from app.services.vector_store import vector_store_manager
+from app.services import gentrix_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cities/{city_id}/files", tags=["files"])
+
+SUPPORTED_EXTENSIONS = {".txt", ".docx", ".pdf", ".csv", ".doc"}
 
 
 @router.get("", response_model=list[FileResponse])
@@ -28,8 +33,15 @@ async def upload_file(city_id: str, file: UploadFile):
     data = await file.read()
     size = s3_service.upload_file(city_id, file.filename, data)
 
-    chunks = chunk_document(file.filename, data)
-    vector_store_manager.add_documents(city_id, chunks)
+    config = s3_service.get_city_config(city_id)
+    folder_id = config.get("folder_id")
+    if folder_id:
+        try:
+            await gentrix_service.upload_document(folder_id, file.filename, data)
+        except Exception:
+            logger.exception(
+                "Failed to upload %s to Gentrix folder %s", file.filename, folder_id
+            )
 
     return FileResponse(filename=file.filename, size_bytes=size, city_id=city_id)
 
@@ -37,22 +49,18 @@ async def upload_file(city_id: str, file: UploadFile):
 @router.delete("/{filename}", response_model=MessageResponse)
 async def delete_file(city_id: str, filename: str):
     s3_service.delete_file(city_id, filename)
-    _rebuild_index(city_id)
-    return MessageResponse(message=f"הקובץ {filename} נמחק בהצלחה.")
 
-
-def _rebuild_index(city_id: str) -> None:
-    """Re-ingest all remaining files to rebuild the FAISS index."""
-    files = s3_service.list_files(city_id)
-    all_chunks = []
-    for f in files:
-        data = s3_service.download_file(city_id, f["filename"])
+    config = s3_service.get_city_config(city_id)
+    folder_id = config.get("folder_id")
+    if folder_id:
         try:
-            chunks = chunk_document(f["filename"], data)
-            all_chunks.extend(chunks)
-        except ValueError:
-            continue
-    vector_store_manager.rebuild(city_id, all_chunks)
+            await gentrix_service.find_and_delete_document(folder_id, filename)
+        except Exception:
+            logger.exception(
+                "Failed to delete %s from Gentrix folder %s", filename, folder_id
+            )
+
+    return MessageResponse(message=f"הקובץ {filename} נמחק בהצלחה.")
 
 
 def _get_ext(filename: str) -> str:

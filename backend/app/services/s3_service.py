@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 from functools import lru_cache
 
@@ -34,6 +35,38 @@ def _vector_store_key(city_id: str, filename: str) -> str:
     return f"{PREFIX}/{city_id}/vector_store/{filename}"
 
 
+def _config_key(city_id: str) -> str:
+    return f"{PREFIX}/{city_id}/config.json"
+
+
+# --------------- City config ---------------
+
+
+def get_city_config(city_id: str) -> dict:
+    """Read per-city config (widget_id, folder_id, etc.) from S3."""
+    s3 = _get_s3_client()
+    try:
+        resp = s3.get_object(Bucket=_bucket(), Key=_config_key(city_id))
+        return json.loads(resp["Body"].read().decode("utf-8"))
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            return {}
+        raise
+
+
+def save_city_config(city_id: str, config: dict) -> None:
+    """Write per-city config to S3, merging with existing values."""
+    existing = get_city_config(city_id)
+    existing.update(config)
+    s3 = _get_s3_client()
+    s3.put_object(
+        Bucket=_bucket(),
+        Key=_config_key(city_id),
+        Body=json.dumps(existing, ensure_ascii=False).encode("utf-8"),
+        ContentType="application/json",
+    )
+
+
 # --------------- City operations ---------------
 
 
@@ -47,7 +80,14 @@ def list_cities() -> list[dict]:
     for cp in resp.get("CommonPrefixes", []):
         city_id = cp["Prefix"].split("/")[1]
         file_count = count_files(city_id)
-        cities.append({"id": city_id, "name": city_id, "file_count": file_count})
+        config = get_city_config(city_id)
+        cities.append({
+            "id": city_id,
+            "name": city_id,
+            "file_count": file_count,
+            "widget_id": config.get("widget_id"),
+            "folder_id": config.get("folder_id"),
+        })
     return cities
 
 

@@ -1,15 +1,9 @@
-interface Source {
-  filename: string
-  page_content: string
-}
-
 interface Props {
   role: 'user' | 'assistant'
   content: string
-  sources?: Source[]
 }
 
-export default function MessageBubble({ role, content, sources }: Props) {
+export default function MessageBubble({ role, content }: Props) {
   const isUser = role === 'user'
 
   return (
@@ -44,20 +38,6 @@ export default function MessageBubble({ role, content, sources }: Props) {
           }`}
         >
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
-
-          {sources && sources.length > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 mb-1.5">מקורות:</p>
-              {sources.map((s, i) => (
-                <details key={i} className="text-xs text-gray-400 mt-1 group">
-                  <summary className="cursor-pointer hover:text-brand-600 transition-colors">
-                    <span className="mr-1">{s.filename}</span>
-                  </summary>
-                  <p className="mt-1.5 text-gray-400 pr-4 leading-relaxed">{s.page_content}</p>
-                </details>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

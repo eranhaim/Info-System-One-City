@@ -8,6 +8,8 @@ export interface City {
   id: string
   name: string
   file_count: number
+  widget_id?: string | null
+  folder_id?: string | null
 }
 
 export async function getCities(): Promise<City[]> {
@@ -15,13 +17,28 @@ export async function getCities(): Promise<City[]> {
   return data
 }
 
-export async function createCity(name: string): Promise<City> {
-  const { data } = await api.post<City>('/cities', { name })
+export async function createCity(
+  name: string,
+  widgetId?: string,
+  folderId?: string
+): Promise<City> {
+  const { data } = await api.post<City>('/cities', {
+    name,
+    widget_id: widgetId || null,
+    folder_id: folderId || null,
+  })
   return data
 }
 
 export async function deleteCity(cityId: string): Promise<void> {
   await api.delete(`/cities/${cityId}`)
+}
+
+export async function updateCityConfig(
+  cityId: string,
+  config: { widget_id?: string; folder_id?: string }
+): Promise<void> {
+  await api.put(`/cities/${cityId}/config`, config)
 }
 
 // ---- Files ----
@@ -61,14 +78,8 @@ export async function syncCity(cityId: string): Promise<SyncResult> {
 
 // ---- Chat ----
 
-export interface Source {
-  filename: string
-  page_content: string
-}
-
 export interface ChatResult {
   answer: string
-  sources: Source[]
   session_id: string
 }
 
