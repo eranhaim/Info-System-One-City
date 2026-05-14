@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from app.models.schemas import FileResponse, MessageResponse
 from app.services import s3_service
 from app.services import gentrix_service
+from app.services.database import cities_col
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,8 @@ async def upload_file(city_id: str, file: UploadFile):
     data = await file.read()
     size = s3_service.upload_file(city_id, file.filename, data)
 
-    config = s3_service.get_city_config(city_id)
-    folder_id = config.get("folder_id")
+    city = await cities_col().find_one({"city_id": city_id})
+    folder_id = city.get("folder_id") if city else None
     if folder_id:
         try:
             await gentrix_service.upload_document(folder_id, file.filename, data)
@@ -50,8 +51,8 @@ async def upload_file(city_id: str, file: UploadFile):
 async def delete_file(city_id: str, filename: str):
     s3_service.delete_file(city_id, filename)
 
-    config = s3_service.get_city_config(city_id)
-    folder_id = config.get("folder_id")
+    city = await cities_col().find_one({"city_id": city_id})
+    folder_id = city.get("folder_id") if city else None
     if folder_id:
         try:
             await gentrix_service.find_and_delete_document(folder_id, filename)

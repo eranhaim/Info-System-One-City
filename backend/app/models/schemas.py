@@ -30,11 +30,27 @@ class ChatRequest(BaseModel):
     city_id: str
     question: str
     session_id: str | None = None
+    user_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     answer: str
     session_id: str
+
+
+class InquiryCloseRequest(BaseModel):
+    session_id: str
+    user_id: str | None = None
+
+
+class UserCreate(BaseModel):
+    name: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    name: str
+    created_at: str
 
 
 class MessageResponse(BaseModel):

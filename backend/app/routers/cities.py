@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
@@ -10,6 +11,7 @@ from app.models.schemas import (
     MessageResponse,
 )
 from app.services import s3_service
+from app.services.database import cities_col
 from app.services.document_loader import chunk_text, extract_text
 from app.services.standardiser import standardise
 from app.services.vector_store import vector_store_manager
@@ -33,25 +35,39 @@ def _to_slug(name: str) -> str:
 
 @router.get("", response_model=list[CityResponse])
 async def list_cities():
-    cities = s3_service.list_cities()
-    return [CityResponse(**c) for c in cities]
+    col = cities_col()
+    cities = await col.find().to_list(500)
+    result = []
+    for c in cities:
+        file_count = s3_service.count_files(c["city_id"])
+        result.append(CityResponse(
+            id=c["city_id"],
+            name=c.get("name", c["city_id"]),
+            file_count=file_count,
+            widget_id=c.get("widget_id"),
+            folder_id=c.get("folder_id"),
+        ))
+    return result
 
 
 @router.post("", response_model=CityResponse, status_code=201)
 async def create_city(body: CityCreate):
     city_id = _to_slug(body.name)
-    existing = {c["id"] for c in s3_service.list_cities()}
-    if city_id in existing:
-        raise HTTPException(status_code=409, detail="יישוב זה כבר קיים במערכת.")
-    s3_service.create_city(city_id)
+    col = cities_col()
 
-    config: dict = {}
-    if body.widget_id:
-        config["widget_id"] = body.widget_id
-    if body.folder_id:
-        config["folder_id"] = body.folder_id
-    if config:
-        s3_service.save_city_config(city_id, config)
+    existing = await col.find_one({"city_id": city_id})
+    if existing:
+        raise HTTPException(status_code=409, detail="יישוב זה כבר קיים במערכת.")
+
+    doc = {
+        "city_id": city_id,
+        "name": body.name,
+        "widget_id": body.widget_id,
+        "folder_id": body.folder_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await col.insert_one(doc)
+    s3_service.create_city(city_id)
 
     return CityResponse(
         id=city_id,
@@ -64,20 +80,25 @@ async def create_city(body: CityCreate):
 
 @router.put("/{city_id}/config", response_model=MessageResponse)
 async def update_city_config(city_id: str, body: CityConfigUpdate):
-    """Update the Gentrix widget_id and/or folder_id for a city."""
-    config: dict = {}
+    update: dict = {}
     if body.widget_id is not None:
-        config["widget_id"] = body.widget_id
+        update["widget_id"] = body.widget_id
     if body.folder_id is not None:
-        config["folder_id"] = body.folder_id
-    if not config:
+        update["folder_id"] = body.folder_id
+    if not update:
         raise HTTPException(status_code=400, detail="לא סופקו שדות לעדכון.")
-    s3_service.save_city_config(city_id, config)
+
+    col = cities_col()
+    result = await col.update_one({"city_id": city_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="יישוב לא נמצא.")
     return MessageResponse(message="ההגדרות עודכנו בהצלחה.")
 
 
 @router.delete("/{city_id}", response_model=MessageResponse)
 async def delete_city(city_id: str):
+    col = cities_col()
+    await col.delete_one({"city_id": city_id})
     s3_service.delete_city(city_id)
     return MessageResponse(message=f"היישוב {city_id} נמחק בהצלחה.")
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { sendChat } from '../services/api'
+import { sendChat, closeInquiry, getChatHistory } from '../services/api'
+import { useUser } from '../context/UserContext'
 import MessageBubble from './MessageBubble'
 
 interface Message {
@@ -9,23 +10,46 @@ interface Message {
 
 interface Props {
   cityId: string
+  initialSessionId?: string
+  onSessionCreated?: (sessionId: string) => void
+  onSessionClosed?: () => void
 }
 
-export default function ChatPanel({ cityId }: Props) {
+export default function ChatPanel({ cityId, initialSessionId, onSessionCreated, onSessionClosed }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionId, setSessionId] = useState<string | undefined>()
+  const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId)
+  const [closing, setClosing] = useState(false)
+  const [restoring, setRestoring] = useState(!!initialSessionId)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { user } = useUser()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   useEffect(() => {
-    setMessages([])
-    setSessionId(undefined)
-  }, [cityId])
+    if (!initialSessionId) {
+      setMessages([])
+      setSessionId(undefined)
+      setRestoring(false)
+      return
+    }
+    setRestoring(true)
+    setSessionId(initialSessionId)
+    getChatHistory(initialSessionId)
+      .then((history) => {
+        const restored: Message[] = []
+        for (const h of history) {
+          restored.push({ role: 'user', content: h.question })
+          restored.push({ role: 'assistant', content: h.answer })
+        }
+        setMessages(restored)
+      })
+      .catch(() => setMessages([]))
+      .finally(() => setRestoring(false))
+  }, [initialSessionId])
 
   const handleSend = async () => {
     const q = input.trim()
@@ -36,8 +60,11 @@ export default function ChatPanel({ cityId }: Props) {
     setLoading(true)
 
     try {
-      const res = await sendChat(cityId, q, sessionId)
-      setSessionId(res.session_id)
+      const res = await sendChat(cityId, q, sessionId, user?.id)
+      if (!sessionId) {
+        setSessionId(res.session_id)
+        onSessionCreated?.(res.session_id)
+      }
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: res.answer },
@@ -50,6 +77,35 @@ export default function ChatPanel({ cityId }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleClose = async () => {
+    if (!sessionId) return
+    setClosing(true)
+    try {
+      await closeInquiry(sessionId, user?.id)
+    } catch {
+      // best effort
+    } finally {
+      setMessages([])
+      setSessionId(undefined)
+      setClosing(false)
+      onSessionClosed?.()
+    }
+  }
+
+  if (restoring) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-50/50">
+        <div className="flex items-center gap-2 text-gray-400 text-sm">
+          <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          טוען שיחה...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -114,6 +170,15 @@ export default function ChatPanel({ cityId }: Props) {
               <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.288Z" />
             </svg>
           </button>
+          {sessionId && (
+            <button
+              onClick={handleClose}
+              disabled={closing}
+              className="px-4 py-3 bg-green-600 text-white rounded-xl text-sm font-medium shadow-sm shadow-green-600/20 hover:bg-green-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 whitespace-nowrap"
+            >
+              {closing ? 'סוגר...' : 'פנייה טופלה ✓'}
+            </button>
+          )}
         </div>
       </div>
     </div>

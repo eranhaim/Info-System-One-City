@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     llm_model_name: str = "gpt-4o-mini"
     embedding_model_name: str = "text-embedding-3-small"
     gentrix_api_key: str = ""
+    mongodb_uri: str = ""
 
     llm_temperature: float = 0.3
 

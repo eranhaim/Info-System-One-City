@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import chat, cities, files
+from app.routers import analytics, chat, cities, files, users
 
 app = FastAPI(title="One City Knowledge System", version="1.0.0")
 
@@ -16,6 +16,8 @@ app.add_middleware(
 app.include_router(cities.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
 
 
 @app.get("/api/health")

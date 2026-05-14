@@ -1,3 +1,7 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+
 interface Props {
   role: 'user' | 'assistant'
   content: string
@@ -8,7 +12,7 @@ export default function MessageBubble({ role, content }: Props) {
 
   return (
     <div className={`flex ${isUser ? 'justify-start' : 'justify-end'} mb-4`}>
-      <div className={`flex items-start gap-2.5 max-w-[78%] ${isUser ? 'flex-row' : 'flex-row-reverse'}`}>
+      <div className={`flex items-start gap-2.5 ${isUser ? 'max-w-[78%] flex-row' : 'max-w-[90%] flex-row-reverse'}`}>
         {/* Avatar */}
         <div
           className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mt-0.5 ${
@@ -37,7 +41,36 @@ export default function MessageBubble({ role, content }: Props) {
               : 'bg-white text-gray-800 rounded-tl-md shadow-sm border border-gray-100'
           }`}
         >
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+          {isUser ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+          ) : (
+            <div className="prose prose-sm max-w-none text-sm leading-relaxed prose-headings:text-gray-800 prose-headings:font-semibold prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-strong:text-gray-800 prose-a:text-brand-600">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
+                components={{
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto my-2 -mx-1">
+                      <table className="min-w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  thead: ({ children }) => (
+                    <thead className="bg-gray-50 text-gray-600">{children}</thead>
+                  ),
+                  th: ({ children }) => (
+                    <th className="px-3 py-2 text-right font-semibold border-b border-gray-200 whitespace-nowrap">{children}</th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="px-3 py-2 border-b border-gray-100 align-top">{children}</td>
+                  ),
+                }}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
       </div>
     </div>

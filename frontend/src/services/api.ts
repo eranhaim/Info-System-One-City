@@ -86,12 +86,178 @@ export interface ChatResult {
 export async function sendChat(
   cityId: string,
   question: string,
-  sessionId?: string
+  sessionId?: string,
+  userId?: string
 ): Promise<ChatResult> {
   const { data } = await api.post<ChatResult>('/chat', {
     city_id: cityId,
     question,
     session_id: sessionId,
+    user_id: userId,
   })
+  return data
+}
+
+export async function closeInquiry(sessionId: string, userId?: string): Promise<void> {
+  await api.post('/chat/close', { session_id: sessionId, user_id: userId })
+}
+
+export interface ChatSession {
+  session_id: string
+  city_id: string
+  title: string
+  message_count: number
+  opened_at: string
+  closed_at: string | null
+}
+
+export interface ChatHistoryMessage {
+  question: string
+  answer: string
+}
+
+export async function getChatSessions(userId: string): Promise<ChatSession[]> {
+  const { data } = await api.get<ChatSession[]>('/chat/sessions', { params: { user_id: userId } })
+  return data
+}
+
+export async function getChatHistory(sessionId: string): Promise<ChatHistoryMessage[]> {
+  const { data } = await api.get<ChatHistoryMessage[]>(`/chat/history/${sessionId}`)
+  return data
+}
+
+// ---- Users ----
+
+export interface User {
+  id: string
+  name: string
+  created_at: string
+}
+
+export async function getUsers(): Promise<User[]> {
+  const { data } = await api.get<User[]>('/users')
+  return data
+}
+
+export async function createUser(name: string): Promise<User> {
+  const { data } = await api.post<User>('/users', { name })
+  return data
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await api.delete(`/users/${userId}`)
+}
+
+// ---- Analytics ----
+
+export interface AnalyticsSummary {
+  total_inquiries: number
+  total_today: number
+  total_yesterday: number
+  avg_duration_ms: number
+  avg_response_ms: number
+  open_inquiries: number
+}
+
+export interface TimeSeriesPoint {
+  date: string
+  count: number
+}
+
+export interface EmployeeDuration {
+  employee: string
+  avg_duration_ms: number
+  count: number
+}
+
+export interface CityCount {
+  city: string
+  count: number
+}
+
+export interface HourlyPoint {
+  hour: number
+  count: number
+}
+
+export interface EmployeePerformance {
+  user_id: string
+  name: string
+  total_inquiries: number
+  avg_duration_ms: number
+  total_messages: number
+  today: number
+}
+
+export interface InquiryLogItem {
+  session_id: string
+  user_id: string | null
+  user_name: string
+  city_id: string
+  message_count: number
+  opened_at: string
+  closed_at: string | null
+  total_duration_ms: number | null
+}
+
+export interface InquiryLogPage {
+  items: InquiryLogItem[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface InquiryMessage {
+  question: string
+  answer: string
+  started_at: string
+  duration_ms: number
+}
+
+export async function getAnalyticsSummary(days = 7): Promise<AnalyticsSummary> {
+  const { data } = await api.get<AnalyticsSummary>('/analytics/summary', { params: { days } })
+  return data
+}
+
+export async function getInquiriesOverTime(days = 30): Promise<TimeSeriesPoint[]> {
+  const { data } = await api.get<TimeSeriesPoint[]>('/analytics/inquiries-over-time', { params: { days } })
+  return data
+}
+
+export async function getDurationByEmployee(): Promise<EmployeeDuration[]> {
+  const { data } = await api.get<EmployeeDuration[]>('/analytics/duration-by-employee')
+  return data
+}
+
+export async function getInquiriesByCity(): Promise<CityCount[]> {
+  const { data } = await api.get<CityCount[]>('/analytics/inquiries-by-city')
+  return data
+}
+
+export async function getHourlyDistribution(days = 30): Promise<HourlyPoint[]> {
+  const { data } = await api.get<HourlyPoint[]>('/analytics/hourly-distribution', { params: { days } })
+  return data
+}
+
+export async function getEmployeePerformance(): Promise<EmployeePerformance[]> {
+  const { data } = await api.get<EmployeePerformance[]>('/analytics/employee-performance')
+  return data
+}
+
+export async function getInquiryLog(params: {
+  page?: number
+  limit?: number
+  employee?: string
+  city?: string
+  status?: string
+  date_from?: string
+  date_to?: string
+}): Promise<InquiryLogPage> {
+  const { data } = await api.get<InquiryLogPage>('/analytics/inquiry-log', { params })
+  return data
+}
+
+export async function getInquiryMessages(sessionId: string): Promise<InquiryMessage[]> {
+  const { data } = await api.get<InquiryMessage[]>(`/analytics/inquiry-log/${sessionId}/messages`)
   return data
 }
