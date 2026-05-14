@@ -1,3 +1,4 @@
+import json
 import logging
 
 import httpx
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 GENTRIX_CHAT_BASE = "https://app.gentrix.ai/api/chat/widget"
 GENTRIX_FOLDERS_BASE = "https://app.gentrix.ai/api/folders"
 
-_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 
 
 def _auth_headers() -> dict[str, str]:
@@ -58,29 +59,48 @@ async def init_conversation(
 async def send_message(
     widget_id: str, conversation_id: str, message: str
 ) -> str:
-    """Send a user message and return the agent's reply text."""
+    """Send a user message and return the agent's reply text.
+
+    The Gentrix chat endpoint returns an SSE stream (text/event-stream).
+    We consume all `text-delta` events and concatenate the deltas.
+    """
     payload = {
         "widgetId": widget_id,
         "conversationId": conversation_id,
         "messages": [{"role": "user", "content": message}],
     }
 
+    collected: list[str] = []
+
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.post(
+        async with client.stream(
+            "POST",
             GENTRIX_CHAT_BASE,
             json=payload,
             headers={**_auth_headers(), "Content-Type": "application/json"},
-        )
-        if not resp.is_success:
-            _log_error(resp, "send_message")
-        resp.raise_for_status()
-        data = resp.json()
+        ) as resp:
+            if not resp.is_success:
+                await resp.aread()
+                _log_error(resp, "send_message")
+                resp.raise_for_status()
 
-    if isinstance(data, str):
-        return data
-    if isinstance(data, dict):
-        return data.get("content") or data.get("message") or data.get("answer", "")
-    return str(data)
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                raw = line[6:]
+                if raw == "[DONE]":
+                    break
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if event.get("type") == "text-delta":
+                    collected.append(event.get("delta", ""))
+
+    answer = "".join(collected)
+    if not answer:
+        logger.warning("Gentrix send_message returned empty answer for conv=%s", conversation_id)
+    return answer
 
 
 # -------------------- Knowledge Base Files --------------------
@@ -96,7 +116,10 @@ async def list_documents(folder_id: str) -> list[dict]:
         if not resp.is_success:
             _log_error(resp, "list_documents")
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if isinstance(data, dict) and "data" in data:
+            return data["data"]
+        return data
 
 
 async def upload_document(
@@ -111,7 +134,7 @@ async def upload_document(
         )
         if not resp.is_success:
             _log_error(resp, f"upload_document({filename})")
-        resp.raise_for_status()
+            resp.raise_for_status()
         result = resp.json()
         logger.info("Uploaded %s to Gentrix folder %s", filename, folder_id)
         return result
